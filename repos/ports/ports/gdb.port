@@ -1,0 +1,13 @@
+LICENSE   := GPLv3
+VERSION   := 7.3.1
+DOWNLOADS := gdb.archive
+
+URL(gdb)  := ftp://ftp.fu-berlin.de/gnu/gdb/gdb-$(VERSION).tar.bz2
+SHA(gdb)  := e57f2c7f93536ef54fab728eb733bf2c36550718
+SIG(gdb)  := ${URL(gdb)}.sig
+KEY(gdb)  := GNU
+DIR(gdb)  := src/noux-pkg/gdb
+
+PATCHES   := $(addprefix ${DIR(gdb)}/patches/, \
+                         $(shell cat $(REP_DIR)/${DIR(gdb)}/patches/series))
+PATCH_OPT := -p1 -d ${DIR(gdb)}

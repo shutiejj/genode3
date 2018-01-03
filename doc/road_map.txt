@@ -1,0 +1,185 @@
+
+                             ========
+                             Road Map
+                             ========
+
+
+Herein, we lay out our plans for evolving Genode. Progress in addition to this
+planning will very much depend on the degree of community support the project
+will receive. The
+[http:/about/challenges - Challenges] page collects some of our ideas to
+advance Genode in various further directions.
+
+The road map is not fixed. If there is commercial interest of pushing the
+Genode technology to a certain direction, we are willing to revisit our plans.
+
+
+Review of 2016
+##############
+
+We originally started the year 2016 with the ambition to expand the Genode
+community by improving the project's appeal towards system builders and
+privacy cautious users. Hence, we started the year with the resolution to
+increase our engagement with the wider community, i.e., in the form of
+publishing tutorial-like articles. Over the course of the year, however, we
+increasingly shifted our focus to architectural and deeply technical topics
+instead.
+
+We ultimately prioritized the concerns of the existing Genode users over
+extending our user base. The existing users - ourself included - are primarily
+interested in API stability and maturity. So we made it our priority to free
+Genode from legacies and known architectural limitations. Over the year, we
+introduced and cultivated the new framework API that is designed for safety,
+achieved cross-kernel binary compatibility, and revised the framework's most
+fundamental protocols. Now that the time of sweeping architectural changes
+lies behind us, we feel much more confident to approach new users.
+
+Apart from the architectural foundations, among the many other construction
+sites of 2016 were the support for the RISC-V architecture, hosting Genode on
+top of the Muen separation kernel and the seL4 microkernel, huge device driver
+improvements (wifi, graphics, USB, ACPI), VirtualBox 5, virtual networking,
+TOR, Rust and many others. Even though we largely deviated from our original
+ambition, we are proud of the outcome of the past year.
+
+
+Big picture for 2017
+####################
+
+Our principle direction as declared at he beginning of 2016 remains unchanged
+for 2017: Making Genode accessible to the world outside the inner circle
+of us enthusiasts. But rather than making this direction the top priority for
+now, let us first push the bounds of what the current users and
+developers can do with Genode. Hence, for the overall theme of 2017, we
+picked: *stability and scalability*. Once Genode reaches the point where it is
+routinely used and stressed for various purposes by the "inner circle", a
+growing user base will follow naturally and organically.
+
+During our seasonal road-map discussion on our mailing list, we identified the
+following topics to address in 2017:
+
+:Application binary interfaces and package management:
+
+  By mid 2016, we attained binary compatibility across the various OS
+  kernels supported by Genode, which cleared the way to introduce the notion
+  of a Genode application binary interface (ABI). This, in turn, is a
+  prerequisite for a scalable handling of binary packages. In 2017, we
+  will leverage these foundations in two ways: Allowing the easy creation
+  of Genode systems out of packages, and realizing a system-update mechanism
+  that allows us to automatically use (and thereby test) the latest versions
+  of Genode components on our machines.
+
+:Dynamically reconfigurable subsystems:
+
+  Until now, Genode subsystems were either static (using the init component to
+  define them) or relied on a scenario-specific dynamic runtime environment
+  (like CLI monitor). By enhancing init to dynamically apply configuration
+  changes, the need for special-purpose runtime environments will
+  disappear. Scenarios like multi-stage booting, boot-medium detection, or
+  a dynamic desktop environment will become dramatically easier to realize.
+
+:Pruning the boot chain:
+
+  Today, Genode on x86 machines still relies on the legacy BIOS boot
+  mechanism. We will explore alternatives such as UEFI boot and
+  coreboot.
+
+:Asynchronous I/O:
+
+  With Genode 16.11, we successfully removed the last blocking inter-component
+  interfaces from the base framework. Still, other parts of the user-level
+  infrastructure, in particular the libc still relies on blocking operations. Even
+  though we have to offer blocking I/O to user applications for POSIX
+  compatibility, the mechanisms used behind the scenes will be changed to leverage
+  Genode's asynchronous I/O primitives.
+
+:VirtualBox 5:
+
+  Currently, we maintain a fully-featured version of VirtualBox 4 (including
+  USB pass-through, audio, shared folders, clipboard, dynamic desktop resizing)
+  and a pretty basic version of VirtualBox 5 (without those integration
+  features). In 2017, we will replace VirtualBox 4 by a fully featured
+  version of VirtualBox 5.
+
+:Updated tool chain and Qt5:
+
+  With version 17.05, we want to experiment with the idea of providing a
+  long-term supportable version of the framework in addition to the quarterly
+  releases. Consequently, at the time of its release, this version should use
+  a modern tool chain that will remain current for the foreseeable future of
+  Genode's regular development. The same holds true for Qt5.
+
+:Hardware-accelerated graphics on Intel:
+
+  Graphics is an important element for many use cases for Genode on x86-based
+  platforms. Even though we experimented with hardware-accelerated 3D
+  graphics
+  [http://genode.org/documentation/release-notes/10.08#Gallium3D_and_Intel_s_Graphics_Execution_Manager - many years ago],
+  the current GUI stack is still based on software-based rendering.
+  We want to overcome this limitation this year.
+
+:Native work flows:
+
+  In the regularly used "Turmvilla" scenarios, most work flows require the
+  use of Linux in a virtual machine. Over the course of the year, we want
+  to move the most important work flows (namely software development and
+  the work with emails) to Genode natively. As a precondition,
+  we need to improve the usability of our GUI infrastructure by adding
+  support for tiled and tabbed windows, and virtual desktops.
+
+:Storage:
+
+  There are several storage-related topics that need our attention to
+  realize the goals stated above to our satisfaction. This includes the
+  performance and stability of the used file-system stack, and the provision
+  of file-based backup and cryptographic functionality.
+
+:Genode-based cloud appliances:
+
+  We want to widen the application scope of Genode by enabling users to
+  easily deploy Genode scenarios on Xen-based cloud platforms.
+
+
+Milestones for 2017
+###################
+
+In the following, we present a rough schedule of the planned work. As usual,
+it is not set in stone. If you are interested in a particular line of work,
+please get in touch.
+
+
+February - Release 17.02
+========================
+
+* Application binary interfaces (ABI)
+* Dynamic init
+* VFS: asynchronous I/O
+
+
+May - Release 17.05
+===================
+
+* Removal of deprecated APIs
+* Updated tool chain
+* Updated Qt5
+* Easy creation of Genode systems out of packages
+* Feature-complete VirtualBox 5
+* Update of the Genode Foundations book
+
+
+August - Release 17.08
+======================
+
+* Hardware-accelerated graphics on Intel-based platforms
+* Support for the seL4 kernel on x86_64 and ARM
+* Use of Genode for cloud-computing appliances (deployment, virtio)
+* GUI: tiled and tabbed window management, virtual desktops
+
+
+November - Release 17.11
+========================
+
+* Revised boot concept (UEFI, trimming the boot chain)
+* Storage: backup, improved file-system support
+* Native work flows for email and development work
+* Test automation for interactive system scenarios
+

@@ -1,0 +1,272 @@
+create_boot_directory
+
+import_from_depot genodelabs/src/[base_src] \
+                  genodelabs/pkg/[drivers_interactive_pkg] \
+                  genodelabs/pkg/wm \
+                  genodelabs/raw/genode_bg \
+                  genodelabs/pkg/backdrop \
+                  genodelabs/src/demo \
+                  genodelabs/src/init \
+                  genodelabs/src/nitpicker \
+                  genodelabs/src/nit_fb \
+                  genodelabs/src/nit_fader \
+                  genodelabs/src/rom_filter \
+                  genodelabs/src/menu_view
+
+install_config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="CPU"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="LOG"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+	</parent-provides>
+
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+
+	<default caps="100"/>
+
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>
+
+	<start name="drivers" caps="1000">
+		<resource name="RAM" quantum="32M"/>
+		<binary name="init"/>
+		<route>
+			<service name="ROM" label="config"> <parent label="drivers.config"/> </service>
+			<service name="Timer"> <child name="timer"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+		<provides>
+			<service name="Input"/> <service name="Framebuffer"/>
+		</provides>
+	</start>
+
+	<start name="nitpicker" caps="100">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Nitpicker"/></provides>
+		<config>
+			<report hover="yes" focus="yes" />
+			<domain name="pointer"   layer="1" content="client" label="no" origin="pointer" />
+			<domain name="panel"     layer="2" content="client" label="no" hover="always" focus="transient" />
+			<domain name="default"   layer="3" color="#ff0000" hover="always" focus="click" />
+			<domain name="decorator" layer="3" content="client" label="no" hover="always" focus="transient" />
+
+			<policy label_prefix="pointer"                domain="pointer"/>
+			<policy label_prefix="wm -> launcher -> menu" domain="panel"/>
+			<policy label_prefix="wm -> decorator"        domain="decorator"/>
+			<policy label_prefix="status_bar"             domain="panel"/>
+			<default-policy                               domain="default"/>
+
+			<global-key name="KEY_SCROLLLOCK" label="xray_trigger -> input" />
+			<global-key name="KEY_F1"         label="xray_trigger -> input" />
+			<global-key name="KEY_F2"         label="xray_trigger -> input" />
+			<global-key name="KEY_LEFTMETA"   label="wm -> launcher" />
+			<global-key name="KEY_F3"         label="wm -> launcher" />
+		</config>
+		<route>
+			<service name="Report"> <child name="report_rom"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="pointer">
+		<resource name="RAM" quantum="1M"/>
+		<route>
+			<service name="Nitpicker"> <child name="nitpicker" /> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="xray_trigger">
+		<resource name="RAM" quantum="1M"/>
+		<config>
+			<press   name="KEY_F1" xray="on"/>
+			<release name="KEY_F1" xray="off"/>
+			<press   name="KEY_F2" xray="toggle"/>
+			<hover domain="panel"/>
+			<hover domain="decorator"/>
+		</config>
+		<route>
+			<service name="ROM" label="hover"> <child name="report_rom"/> </service>
+			<service name="Nitpicker"> <child name="nitpicker"/>  </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="status_bar">
+		<resource name="RAM" quantum="1M"/>
+		<route>
+			<service name="ROM" label="focus"> <child name="report_rom"/> </service>
+			<service name="Nitpicker"> <child name="nitpicker"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+
+	<start name="report_rom">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Report"/> <service name="ROM"/> </provides>
+		<config verbose="no">
+			<policy label="decorator_config -> xray"      report="xray_trigger -> xray"/>
+			<policy label="layouter -> window_list"       report="wm -> window_list"/>
+			<policy label="layouter -> focus_request"     report="wm -> focus_request" />
+			<policy label="decorator -> window_layout"    report="layouter -> window_layout"/>
+			<policy label="wm -> resize_request"          report="layouter -> resize_request"/>
+			<policy label="decorator -> pointer"          report="wm -> pointer"/>
+			<policy label="layouter -> hover"             report="decorator -> hover"/>
+			<policy label="wm -> focus"                   report="layouter -> focus"/>
+			<policy label="status_bar -> focus"           report="nitpicker -> focus"/>
+			<policy label="launcher -> focus"             report="nitpicker -> focus"/>
+			<policy label="xray_trigger -> hover"         report="nitpicker -> hover"/>
+			<policy label="layouter -> decorator_margins" report="decorator -> decorator_margins"/>
+		</config>
+	</start>
+
+	<start name="wm" caps="200">
+		<resource name="RAM" quantum="6M"/>
+		<provides>
+			<service name="Nitpicker"/>
+		</provides>
+		<config>
+			<policy label_prefix="decorator"           role="decorator"/>
+			<policy label_prefix="layouter"            role="layouter"/>
+			<policy label_prefix="launcher -> menu"    role="direct"/>
+			<policy label_prefix="launcher -> testnit" role="direct"/>
+		</config>
+		<route>
+			<service name="ROM" label="focus">          <child name="report_rom"/> </service>
+			<service name="ROM" label="resize_request"> <child name="report_rom"/> </service>
+			<any-service>
+				<child name="nitpicker"/> <parent/> <any-child/>
+			</any-service>
+		</route>
+	</start>
+
+	<start name="layouter">
+		<binary name="floating_window_layouter"/>
+		<resource name="RAM" quantum="4M"/>
+		<route>
+			<service name="ROM" label="window_list">       <child name="report_rom"/> </service>
+			<service name="ROM" label="focus_request">     <child name="report_rom"/> </service>
+			<service name="ROM" label="hover">             <child name="report_rom"/> </service>
+			<service name="ROM" label="decorator_margins"> <child name="report_rom"/> </service>
+			<any-service>
+				<child name="wm"/> <parent/> <any-child/>
+			</any-service>
+		</route>
+	</start>
+
+	<start name="decorator">
+		<binary name="decorator"/>
+		<resource name="RAM" quantum="8M"/>
+		<route>
+			<service name="ROM" label="config">
+				<child name="decorator_config"/> </service>
+			<service name="ROM" label="window_layout">
+				<child name="report_rom"/> </service>
+			<service name="ROM" label="pointer">
+				<child name="report_rom"/> </service>
+			<any-service>
+				<child name="wm"/> <parent/> <any-child/>
+			</any-service>
+		</route>
+	</start>
+
+	<start name="decorator_config">
+		<binary name="rom_filter"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="ROM"/></provides>
+		<config verbose="yes">
+
+			<input name="xray_enabled" rom="xray" node="xray">
+				<attribute name="enabled" />
+			</input>
+
+			<output node="config">
+				<inline>
+					<controls>
+						<title/> <minimizer/> <maximizer/> <closer/>
+					</controls>
+				</inline>
+				<if>
+					<has_value input="xray_enabled" value="yes" />
+					<then>
+						<inline>
+							<default-policy color="#ff0000" gradient="75" />
+						</inline>
+					</then>
+				</if>
+			</output>
+
+		</config>
+		<route>
+			<service name="ROM" label="xray"> <child name="report_rom"/> </service>
+			<any-service> <parent/> </any-service>
+		</route>
+	</start>
+
+	<start name="launcher" caps="1000">
+		<resource name="RAM" quantum="60M" />
+		<config focus_prefix="wm -> launcher -> ">
+			<subsystem name="scout" title="Scout" caps="200">
+				<resource name="RAM" quantum="20M" />
+				<binary name="scout" />
+			</subsystem>
+			<subsystem name="testnit1" title="Nitpicker Test" caps="25">
+				<resource name="RAM" quantum="2M" />
+				<binary name="testnit" />
+			</subsystem>
+			<subsystem name="testnit2" title="Nitpicker Test 2" caps="25">
+				<resource name="RAM" quantum="2M" />
+				<binary name="testnit" />
+			</subsystem>
+			<subsystem name="testnit3" title="Nitpicker Test 3" caps="25">
+				<resource name="RAM" quantum="2M" />
+				<binary name="testnit" />
+			</subsystem>
+			<subsystem name="scout2" title="Scoutx" caps="25">
+				<resource name="RAM" quantum="20M" />
+				<binary name="scout" />
+			</subsystem>
+			<subsystem name="testnit4" title="Nitpicker Testx" caps="25">
+				<resource name="RAM" quantum="2M" />
+				<binary name="testnit" />
+			</subsystem>
+			<subsystem name="testnit5" title="Nitpicker Test5" caps="25">
+				<resource name="RAM" quantum="2M" />
+				<binary name="testnit" />
+			</subsystem>
+			<subsystem name="backdrop" title="Backdrop" caps="25">
+				<resource name="RAM" quantum="4M"/>
+				<binary name="backdrop" />
+				<config>
+					<libc>
+						<vfs>
+						</vfs>
+					</libc>
+					<fill color="#224433" />
+				</config>
+			</subsystem>
+
+		</config>
+		<route>
+			<service name="ROM" label="focus"> <child name="report_rom" /> </service>
+			<any-service> <child name="wm"/> <parent/> <any-child/> </any-service>
+		</route>
+	</start>
+</config>}
+
+build { app/launcher test/nitpicker app/status_bar app/xray_trigger }
+
+build_boot_image { testnit launcher xray_trigger status_bar }
+
+
+run_genode_until forever

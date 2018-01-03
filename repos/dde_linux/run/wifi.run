@@ -1,0 +1,158 @@
+#
+# Build
+#
+
+set build_components {
+	core init
+	drivers/timer drivers/wifi
+	drivers/rtc
+	server/report_rom
+	server/dynamic_rom
+	test/lwip/http_srv
+	lib/vfs/jitterentropy
+}
+
+proc gpio_drv { } { if {[have_spec rpi] && [have_spec hw]}  { return hw_gpio_drv }
+                    if {[have_spec rpi] && [have_spec foc]} { return foc_gpio_drv }
+                    return gpio_drv }
+
+lappend_if [have_spec gpio]             build_components drivers/gpio
+
+source ${genode_dir}/repos/base/run/platform_drv.inc
+append_platform_drv_build_components
+
+build $build_components
+
+create_boot_directory
+
+#
+# Generate config
+#
+
+set config {
+<config verbose="yes">
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="IRQ"/>
+		<service name="IO_MEM"/>
+		<service name="IO_PORT"/>
+		<service name="PD"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="LOG"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="100"/>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Timer"/> </provides>
+	</start>
+	<start name="rtc_drv">
+		<resource name="RAM" quantum="1M"/>
+		<provides> <service name="Rtc"/> </provides>
+	</start>
+	<start name="test-lwip_httpsrv">
+		<resource name="RAM" quantum="5M"/>
+		<config>
+			<libc stdout="/dev/log" stderr="/dev/log">
+				<vfs> <dir name="dev"> <log/> </dir> </vfs>
+			</libc>
+		</config>
+	</start>
+	<start name="report_rom">
+		<resource name="RAM" quantum="2M"/>
+		<provides> <service name="Report"/> <service name="ROM"/> </provides>
+		<config/>
+	</start>
+	<start name="config_rom">
+		<binary name="dynamic_rom"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="ROM"/></provides>
+		<config verbose="yes">
+			<rom name="wlan_configuration">
+				<inline description="DISCONNECT"> <selected_network/> </inline>
+				<sleep milliseconds="10000"/> <!-- 10 seconds -->
+				<inline description="CONNECT">}
+append config "<selected_network ssid=\"$::env(GENODE_WIFI_SSID)\" protection=\"WPA-PSK\" psk=\"$::env(GENODE_WIFI_PSK)\"/>"
+append config {
+				</inline>
+				<sleep milliseconds="300000"/> <!-- 5 minutes -->
+			</rom>
+		</config>
+	</start>
+	<start name="wifi_drv" caps="220">
+		<resource name="RAM" quantum="32M"/>
+		<provides> <service name="Nic"/> </provides>
+		<config ld_verbose="yes" verbose="yes" connected_scan_interval="30">
+			<libc stdout="/dev/log" stderr="/dev/log" rtc="/dev/rtc">
+				<vfs>
+					<dir name="dev"> <log/> <rtc/>
+						<jitterentropy name="random"/>
+						<jitterentropy name="urandom"/>
+					</dir>
+					<dir name="config"> <ram/> </dir>
+				</vfs>
+			</libc>
+		</config>
+		<route>
+			<service name="Rtc"> <any-child/> </service>
+			<service name="Report"> <child name="report_rom"/> </service>
+			<service name="ROM" label="wlan_configuration"> <child name="config_rom"/> </service>
+			<any-service> <parent/> <any-child/> </any-service>
+		</route>
+	</start>}
+
+append_platform_drv_config
+
+append_if [have_spec gpio] config "
+	<start name=\"[gpio_drv]\">
+		<resource name=\"RAM\" quantum=\"4M\"/>
+		<provides><service name=\"Gpio\"/></provides>
+		<config/>
+	</start>"
+
+append config {
+</config>
+}
+
+install_config $config
+
+set firmware_modules {
+	iwlwifi-6000-4.ucode
+	iwlwifi-6000g2a-6.ucode
+	iwlwifi-6000g2b-6.ucode
+	iwlwifi-7260-16.ucode
+	iwlwifi-7265-16.ucode
+	iwlwifi-7265D-16.ucode
+	iwlwifi-8000C-16.ucode
+}
+
+#
+# Boot modules
+#
+
+# generic modules
+set boot_modules {
+	core ld.lib.so init timer rtc_drv report_rom dynamic_rom
+	vfs_jitterentropy.lib.so posix.lib.so
+	libc.lib.so libm.lib.so libcrypto.lib.so libssl.lib.so
+	wpa_driver_nl80211.lib.so wpa_supplicant.lib.so
+	wifi.lib.so
+	wifi_drv
+
+	test-lwip_httpsrv lwip.lib.so
+}
+
+append boot_modules $firmware_modules
+
+lappend_if [have_spec gpio] boot_modules [gpio_drv]
+
+append_platform_drv_boot_modules
+
+build_boot_image $boot_modules
+
+run_genode_until forever
+
+# vi: set ft=tcl :

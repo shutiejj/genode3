@@ -1,0 +1,155 @@
+/*
+ * \brief  ROM filesystem
+ * \author Norman Feske
+ * \date   2014-04-14
+ */
+
+/*
+ * Copyright (C) 2014-2017 Genode Labs GmbH
+ *
+ * This file is part of the Genode OS framework, which is distributed
+ * under the terms of the GNU Affero General Public License version 3.
+ */
+
+#ifndef _INCLUDE__VFS__ROM_FILE_SYSTEM_H_
+#define _INCLUDE__VFS__ROM_FILE_SYSTEM_H_
+
+#include <base/attached_rom_dataspace.h>
+#include <vfs/file_system.h>
+
+namespace Vfs { class Rom_file_system; }
+
+
+class Vfs::Rom_file_system : public Single_file_system
+{
+	private:
+
+		struct Label
+		{
+			enum { LABEL_MAX_LEN = 64 };
+			char string[LABEL_MAX_LEN];
+
+			Label(Xml_node config)
+			{
+				/* obtain label from config */
+				string[0] = 0;
+				try { config.attribute("label").value(string, sizeof(string)); }
+				catch (...)
+				{
+					/* use VFS node name if label was not provided */
+					string[0] = 0;
+					try { config.attribute("name").value(string, sizeof(string)); }
+					catch (...) { }
+				}
+			}
+		} _label;
+
+		Genode::Attached_rom_dataspace _rom;
+
+		class Rom_vfs_handle : public Single_vfs_handle
+		{
+			private:
+
+				Genode::Attached_rom_dataspace &_rom;
+
+			public:
+
+				Rom_vfs_handle(Directory_service              &ds,
+				               File_io_service                &fs,
+				               Genode::Allocator              &alloc,
+				               Genode::Attached_rom_dataspace &rom)
+				: Single_vfs_handle(ds, fs, alloc, 0), _rom(rom) { }
+
+				Read_result read(char *dst, file_size count,
+				                 file_size &out_count) override
+				{
+					/* file read limit is the size of the dataspace */
+					file_size const max_size = _rom.size();
+
+					/* current read offset */
+					file_size const read_offset = seek();
+
+					/* maximum read offset, clamped to dataspace size */
+					file_size const end_offset = min(count + read_offset, max_size);
+
+					/* source address within the dataspace */
+					char const *src = _rom.local_addr<char>() + read_offset;
+
+					/* check if end of file is reached */
+					if (read_offset >= end_offset) {
+						out_count = 0;
+						return READ_OK;
+					}
+
+					/* copy-out bytes from ROM dataspace */
+					file_size const num_bytes = end_offset - read_offset;
+
+					memcpy(dst, src, num_bytes);
+
+					out_count = num_bytes;
+					return READ_OK;
+				}
+
+				Write_result write(char const *src, file_size count,
+				                   file_size &out_count) override
+				{
+					out_count = 0;
+					return WRITE_ERR_INVALID;
+				}
+
+				bool read_ready() { return true; }
+		};
+
+	public:
+
+		Rom_file_system(Genode::Env &env,
+		                Genode::Allocator&,
+		                Genode::Xml_node config,
+		                Io_response_handler &)
+		:
+			Single_file_system(NODE_TYPE_FILE, name(), config),
+			_label(config),
+			_rom(env, _label.string)
+		{ }
+
+		static char const *name()   { return "rom"; }
+		char const *type() override { return "rom"; }
+
+		/*********************************
+		 ** Directory-service interface **
+		 ********************************/
+
+		Open_result open(char const  *path, unsigned,
+		                 Vfs_handle **out_handle,
+		                 Allocator   &alloc) override
+		{
+			if (!_single_file(path))
+				return OPEN_ERR_UNACCESSIBLE;
+
+			_rom.update();
+
+			*out_handle = new (alloc) Rom_vfs_handle(*this, *this, alloc, _rom);
+			return OPEN_OK;
+		}
+
+		Dataspace_capability dataspace(char const *path) override
+		{
+			return _rom.cap();
+		}
+
+		/********************************
+		 ** File I/O service interface **
+		 ********************************/
+
+		Stat_result stat(char const *path, Stat &out) override
+		{
+			Stat_result result = Single_file_system::stat(path, out);
+
+			_rom.update();
+			out.size = _rom.valid() ? _rom.size() : 0;
+
+			return result;
+		}
+};
+
+#endif /* _INCLUDE__VFS__ROM_FILE_SYSTEM_H_ */

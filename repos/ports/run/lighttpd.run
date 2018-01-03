@@ -1,0 +1,128 @@
+#
+# \brief  Example for running lighttpd
+# \author Norman Feske
+# \date   2012-08-16
+#
+
+set build_components {
+	core init
+	drivers/nic
+	drivers/timer
+	app/lighttpd
+}
+
+source ${genode_dir}/repos/base/run/platform_drv.inc
+append_platform_drv_build_components
+
+build $build_components
+
+create_boot_directory
+
+append config {
+<config>
+	<parent-provides>
+		<service name="ROM"/>
+		<service name="LOG"/>
+		<service name="RM"/>
+		<service name="CPU"/>
+		<service name="PD"/>
+		<service name="IRQ"/>
+		<service name="IO_PORT"/>
+		<service name="IO_MEM"/>
+	</parent-provides>
+	<default-route>
+		<any-service> <parent/> <any-child/> </any-service>
+	</default-route>
+	<default caps="100"/>
+	<start name="timer">
+		<resource name="RAM" quantum="1M"/>
+		<provides><service name="Timer"/></provides>
+	</start>}
+
+append_platform_drv_config
+
+append config {
+	<start name="nic_drv">
+		<binary name="} [nic_drv_binary] {"/>
+		<resource name="RAM" quantum="4M"/>
+		<provides><service name="Nic"/></provides>
+	</start>
+	<start name="lighttpd" caps="200">
+		<resource name="RAM" quantum="1G" />
+		<config>
+			<arg value="lighttpd" />
+			<arg value="-f" />
+			<arg value="/etc/lighttpd/lighttpd.conf" />
+			<arg value="-D" />
+			<vfs>
+				<dir name="dev">
+					<log/>
+					<null/>
+				</dir>
+				<dir name="etc">
+					<dir name="lighttpd">
+						<inline name="lighttpd.conf">
+# lighttpd configuration
+server.port          = 80
+server.document-root = "/website"
+server.event-handler = "select"
+server.network-backend = "write"
+index-file.names     = (
+  "index.xhtml", "index.html", "index.htm"
+)
+mimetype.assign      = (
+  ".html"         =>      "text/html",
+  ".htm"          =>      "text/html"
+)
+						</inline>
+					</dir>
+				</dir>
+				<dir name="website">
+					<inline name="index.html">
+<html>
+	<head>
+		<title>Hello</title>
+	</head>
+	<body>
+		<p>Hello Genode!</p>
+		<b>I am bold ;-)</b>
+	</body>
+</html>
+					</inline>
+				</dir>
+			</vfs>
+			<libc stdin="/dev/null" stdout="/dev/log" stderr="/dev/log"/>
+		</config>
+	</start>}
+
+append config {
+</config>}
+
+install_config $config
+
+
+#
+# Boot modules
+#
+
+# generic modules
+append boot_modules {
+	core init timer ld.lib.so } [nic_drv_binary] {
+	libc.lib.so libm.lib.so posix.lib.so
+	lwip.lib.so zlib.lib.so
+	lighttpd
+}
+
+# platform-specific modules
+append_platform_drv_boot_modules
+
+build_boot_image $boot_modules
+
+append_if [have_spec x86]     qemu_args " -net nic,model=e1000 "
+append_if [have_spec lan9118] qemu_args " -net nic,model=lan9118 "
+
+append qemu_args " -net user -redir tcp:5555::80 "
+append qemu_args " -nographic -serial mon:stdio "
+append xen_args  { sdl=0\; vif=\["model=e1000,mac=02:00:00:00:01:01,bridge=xenbr0"\] }
+
+run_genode_until forever

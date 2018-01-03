@@ -1,0 +1,52 @@
+build {
+	core init drivers/timer server/log_terminal noux/minimal lib/libc_noux
+	test/noux_fork
+}
+
+create_boot_directory
+
+install_config {
+	<config verbose="yes">
+		<parent-provides>
+			<service name="ROM"/>
+			<service name="LOG"/>
+			<service name="RM"/>
+			<service name="CPU"/>
+			<service name="PD"/>
+			<service name="IRQ"/>
+			<service name="IO_MEM"/>
+			<service name="IO_PORT"/>
+		</parent-provides>
+		<default-route>
+			<any-service> <any-child/> <parent/> </any-service>
+		</default-route>
+		<start name="timer">
+			<resource name="RAM" quantum="1M"/>
+			<provides><service name="Timer"/></provides>
+		</start>
+		<start name="log_terminal">
+			<resource name="RAM" quantum="2M"/>
+			<provides><service name="Terminal"/></provides>
+		</start>
+		<start name="noux">
+			<resource name="RAM" quantum="1G"/>
+			<config verbose="yes" stdin="/null" stdout="/log" stderr="/log">
+				<fstab>
+					<null/> <log/>
+					<rom name="test-noux_fork" />
+				</fstab>
+				<start name="test-noux_fork"> </start>
+			</config>
+		</start>
+	</config>
+}
+
+build_boot_image {
+	core init timer log_terminal noux ld.lib.so libc.lib.so libm.lib.so
+	libc_noux.lib.so posix.lib.so test-noux_fork
+}
+
+append qemu_args " -nographic "
+
+run_genode_until "--- parent done ---.*\n" 20
+run_genode_until "child.*exited.*\n" 5 [output_spawn_id]
