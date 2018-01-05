@@ -23,13 +23,19 @@ struct Remote_attestation::Session_component : Genode::Rpc_object<Session>
 	char* create_attestation(char nonce_1, int timeStamp,
 		char optional, char code_measurement) {
 
-		char* attestation_report = 0;
+		char* attestation_report = "Hello world";
 //		int i=0; // will point to the location in the report 
 
 		Genode::log("obtaining key now");
 		Genode::log(nonce_1);
 		//attestation_report = "asfasd";
 		return attestation_report;
+	}
+
+	struct attestation_report test1(int length){
+		struct attestation_report report;
+		*report.code_measurement = length;
+		return report;
 	}
 };
 

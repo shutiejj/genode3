@@ -31,6 +31,10 @@ struct Remote_attestation::Session_client : Genode::Rpc_client<Session>
 		return call<Rpc_create_attestation>(nonce_1,timeStamp,
 			optional,code_measurement);
 	}
+
+	struct attestation_report test1(int length){
+		return call<Rpc_test1>(length);
+	}
 };
 
 #endif /* _INCLUDE__HELLO_SESSION_H__CLIENT_H_ */
